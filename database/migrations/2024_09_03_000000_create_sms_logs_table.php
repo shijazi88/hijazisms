@@ -17,7 +17,17 @@ class CreateSmsLogsTable extends Migration
             $table->id();
             $table->string('mobile');
             $table->text('sms');
-            $table->enum('status', ['success', 'failed'])->default('failed');
+            $table->enum('status', ['scheduled', 'success', 'failed'])->default('scheduled');
+            $table->timestamp('send_at')->nullable(); // NULL means immediate send, otherwise it's scheduled
+            $table->timestamps();
+        });
+
+        // Separate table for tracking rate limits
+        Schema::create('sms_rate_limits', function (Blueprint $table) {
+            $table->id();
+            $table->string('mobile');
+            $table->integer('sent_count')->default(0);
+            $table->timestamp('last_sent_at')->nullable();
             $table->timestamps();
         });
     }
@@ -30,5 +40,6 @@ class CreateSmsLogsTable extends Migration
     public function down()
     {
         Schema::dropIfExists('sms_logs');
+        Schema::dropIfExists('sms_rate_limits');
     }
 }
