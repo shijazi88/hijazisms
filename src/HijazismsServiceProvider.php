@@ -8,13 +8,14 @@ class HijazismsServiceProvider extends ServiceProvider
 {
     public function register()
     {
-        // Merge package configuration with application's published configuration
+        // Merge the configuration file
         $this->mergeConfigFrom(__DIR__.'/../config/hijazisms.php', 'hijazisms');
 
         // Register the SmsManager service
         $this->app->singleton(SmsManager::class, function ($app) {
             return new SmsManager($app);
         });
+
     }
 
     public function boot()
@@ -22,6 +23,8 @@ class HijazismsServiceProvider extends ServiceProvider
         // Publish the configuration file
         $this->publishes([
             __DIR__.'/../config/hijazisms.php' => config_path('hijazisms.php'),
-        ], 'config');
+        ], 'hijazisms-config');
+
+
     }
 }
