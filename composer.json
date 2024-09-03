@@ -1,0 +1,16 @@
+{
+  "name": "hijazi/hijazisms",
+  "description": "A Laravel package for sending SMS via different providers",
+  "autoload": {
+    "psr-4": {
+      "Hijazi\\Hijazisms\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "hijazi",
+      "email": "mohamadsafwan.hijazi@gmail.com"
+    }
+  ],
+  "require": {}
+}
