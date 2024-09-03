@@ -1,6 +1,6 @@
-# Firebase Push Notification Package for Laravel
+# Hijazisms - SMS Sending Package for Laravel
 
-This package provides a comprehensive solution for managing and sending Firebase push notifications in Laravel applications. It includes functionality for topic management, sending notifications, subscribing devices to topics, and ensuring that notifications are only sent to active (non-deleted) topics. The package supports both the Legacy (Current) API and the Firebase Cloud Messaging (FCM) V1 API.
+This package provides a comprehensive solution for sending SMS using different providers in Laravel applications. It includes functionality for sending SMS directly, logging SMS messages to a database, and implementing a retry mechanism for failed SMS deliveries.
 
 ## Table of Contents
 
@@ -8,20 +8,19 @@ This package provides a comprehensive solution for managing and sending Firebase
 2. [Installation](#installation)
 3. [Configuration](#configuration)
 4. [Usage](#usage)
-   - [Sending Notifications](#sending-notifications)
-   - [Managing Topics](#managing-topics)
-   - [Subscribing Devices to Topics](#subscribing-devices-to-topics)
-   - [Using the FCM V1 API](#using-the-fcm-v1-api)
-5. [Explanation of Modules](#explanation-of-modules)
-6. [Contributing](#contributing)
-7. [License](#license)
+   - [Sending SMS Without Logging](#sending-sms-without-logging)
+   - [Sending SMS with Logging](#sending-sms-with-logging)
+   - [Retrying Failed SMS](#retrying-failed-sms)
+5. [Managing Migrations](#managing-migrations)
+6. [Explanation of Modules](#explanation-of-modules)
+7. [Contributing](#contributing)
+8. [License](#license)
 
 ## Features
 
-- Send notifications to single or multiple devices.
-- Manage Firebase topics, including defining and tracking them in a database.
-- Automatically prevent notifications from being sent to deleted topics.
-- Supports both Legacy (Current) API and FCM V1 API.
+- Send SMS using multiple providers (e.g., WhatsApp, Msgat, Unifonic).
+- Log SMS messages to a database with status tracking (success/failed).
+- Retry failed SMS messages.
 - Seamless integration with Laravel’s configuration and service container.
 
 ## Installation
@@ -31,7 +30,7 @@ This package provides a comprehensive solution for managing and sending Firebase
 To install the package, run the following command in your Laravel project:
 
 ```bash
-composer require hijazi/firebase-push
+composer require hijazi/hijazisms
 ```
 
 ### 2. Publish the Configuration and Migration
@@ -39,13 +38,13 @@ composer require hijazi/firebase-push
 Next, publish the configuration file and migration using Artisan commands:
 
 ```bash
-php artisan vendor:publish --provider="Hijazi\FirebasePush\FirebasePushServiceProvider" --tag="firebase-push-config"
-php artisan vendor:publish --provider="Hijazi\FirebasePush\FirebasePushServiceProvider" --tag="migrations"
+php artisan vendor:publish --provider="Hijazi\Hijazisms\HijazismsServiceProvider" --tag=config
+php artisan vendor:publish --provider="Hijazi\Hijazisms\HijazismsServiceProvider" --tag=migrations
 ```
 
 ### 3. Run the Migration
 
-Once the migration is published, run it to create the firebase_topics table:
+After publishing, run the migration to create the `sms_logs` table:
 
 ```bash
 php artisan migrate
@@ -53,186 +52,126 @@ php artisan migrate
 
 ## Configuration
 
-### 1. Firebase Server Key
+### 1. Environment Variables
 
-Add your Firebase Server Key to your .env file:
+Add your SMS provider credentials to the `.env` file:
 
-```bash
-FIREBASE_SERVER_KEY=your-firebase-server-key
+```env
+# WhatsApp Provider
+WHATSAPP_API_KEY=your-whatsapp-api-key
+
+# Msgat Provider
+MSGAT_API_KEY=your-msgat-api-key
+MSGAT_SENDER_NAME=your-sender-name
+
+# Unifonic Provider
+UNIFONIC_APP_SID=your-unifonic-app-sid
 ```
 
-This key is necessary for authenticating requests to Firebase Cloud Messaging (FCM) when using the Legacy API.
+### 2. Configuration File
 
-### 2. Config File
+The configuration file `config/hijazisms.php` is published to your Laravel application. It contains the settings for each provider:
 
-The configuration file `config/firebase_push.php` is published to your Laravel application. It contains basic configuration options, including the server key and other relevant settings.
+```php
+return [
+    'providers' => [
+        'whatsapp' => [
+            'api_key' => env('WHATSAPP_API_KEY', 'your-default-whatsapp-api-key'),
+        ],
+        'msgat' => [
+            'api_key' => env('MSGAT_API_KEY', 'your-default-msgat-api-key'),
+            'sender_name' => env('MSGAT_SENDER_NAME', 'your-default-sender-name'),
+        ],
+        'unifonic' => [
+            'app_sid' => env('UNIFONIC_APP_SID', 'your-default-unifonic-app-sid'),
+        ],
+    ],
+];
+```
 
 ## Usage
 
-### 1. Sending Notifications
+### 1. Sending SMS Without Logging
 
-#### Send Notification to Multiple Devices (Legacy API)
-
-To send the same notification to multiple devices using the Legacy API, use the `sendNotificationLegacy` method:
+To send SMS using a specific provider without logging it to the database, use the `sendSms` method:
 
 ```php
-use Hijazi\FirebasePush\FirebasePushService;
+use Hijazi\Hijazisms\SmsManager;
+use Hijazi\Hijazisms\Providers\WhatsappProvider;
 
-$firebasePushService = app(FirebasePushService::class);
-$title = "Notification Title";
-$body = "This is the body of the notification.";
-$tokens = ['device_token1', 'device_token2'];
+$smsManager = app(SmsManager::class);
+$smsManager->setProvider(new WhatsappProvider(config('hijazisms.providers.whatsapp.api_key')));
 
-$response = $firebasePushService->sendNotificationLegacy($title, $body, $tokens);
+$recipient = '0123456789';
+$message = 'Your verification code is 123456';
+$otp = '123456';
 
-if ($response) {
-    echo "Notification sent successfully.";
+$status = $smsManager->sendSms($recipient, $message, $otp);
+
+if ($status) {
+    echo "SMS sent successfully.";
 } else {
-    echo "Failed to send notification.";
+    echo "Failed to send SMS.";
 }
 ```
 
-#### Send Notification to Multiple Devices (FCM V1 API)
+### 2. Sending SMS with Logging
 
-To send the same notification to multiple devices using the FCM V1 API, use the `sendNotificationV1` method:
+To send SMS and log the attempt to the database, use the `sendSmsAndLog` method:
 
 ```php
-use Hijazi\FirebasePush\FirebasePushService;
+use Hijazi\Hijazisms\SmsManager;
+use Hijazi\Hijazisms\Providers\WhatsappProvider;
 
-$firebasePushService = app(FirebasePushService::class);
-$title = "Notification Title";
-$body = "This is the body of the notification.";
-$tokens = ['device_token1', 'device_token2'];
-$serviceAccountPath = storage_path('your-service-account.json');
-$projectId = "your-firebase-project-id";
+$smsManager = app(SmsManager::class);
+$smsManager->setProvider(new WhatsappProvider(config('hijazisms.providers.whatsapp.api_key')));
 
-$response = $firebasePushService->sendNotificationV1($title, $body, $tokens, $serviceAccountPath, $projectId);
+$recipient = '0123456789';
+$message = 'Your verification code is 123456';
+$otp = '123456';
 
-if ($response) {
-    echo "Notification sent successfully using FCM V1 API.";
+$status = $smsManager->sendSmsAndLog($recipient, $message, $otp);
+
+if ($status === 'success') {
+    echo "SMS sent and logged successfully.";
 } else {
-    echo "Failed to send notification using FCM V1 API.";
+    echo "Failed to send SMS and log it.";
 }
 ```
 
-### 2. Managing Topics
+### 3. Retrying Failed SMS
 
-The package automatically manages topics in your database. You can define topics, check if they are active, and mark them as deleted.
-
-#### Send Notification to a Topic (Legacy API)
-
-To send a notification to all devices subscribed to a topic using the Legacy API, use the `sendToTopicLegacy` method:
+To retry sending SMS messages that previously failed, use the `retryFailedSms` method:
 
 ```php
-use Hijazi\FirebasePush\FirebasePushService;
-
-$firebasePushService = app(FirebasePushService::class);
-$topic = "news";
-$title = "Breaking News";
-$body = "This is a news update.";
-
-$response = $firebasePushService->sendToTopicLegacy($title, $body, $topic);
-
-if ($response) {
-    echo "Notification sent successfully to the topic (Legacy API).";
-} else {
-    echo "Failed to send notification to the topic (Legacy API).";
-}
+$smsManager->retryFailedSms();
 ```
 
-#### Send Notification to a Topic (FCM V1 API)
+## Managing Migrations
 
-To send a notification to all devices subscribed to a topic using the FCM V1 API, use the `sendToTopicV1` method:
+The package includes a migration file that creates the `sms_logs` table used for logging SMS messages. To publish the migration to your main Laravel application, run:
 
-```php
-use Hijazi\FirebasePush\FirebasePushService;
-
-$firebasePushService = app(FirebasePushService::class);
-$topic = "news";
-$title = "Breaking News";
-$body = "This is a news update.";
-$serviceAccountPath = storage_path('your-service-account.json');
-$projectId = "your-firebase-project-id";
-
-$response = $firebasePushService->sendToTopicV1($title, $body, $topic, $serviceAccountPath, $projectId);
-
-if ($response) {
-    echo "Notification sent successfully to the topic (FCM V1 API).";
-} else {
-    echo "Failed to send notification to the topic (FCM V1 API).";
-}
+```bash
+php artisan vendor:publish --provider="Hijazi\Hijazisms\HijazismsServiceProvider" --tag=migrations
 ```
 
-### 3. Subscribing Devices to Topics
+After publishing, run the migration:
 
-#### Subscribe Devices to a Topic (Legacy API)
-
-To subscribe devices to a topic using the Legacy API, use the `subscribeToTopicLegacy` method:
-
-```php
-use Hijazi\FirebasePush\FirebasePushService;
-
-$firebasePushService = app(FirebasePushService::class);
-$topic = "news";
-$tokens = ['device_token1', 'device_token2'];
-
-$response = $firebasePushService->subscribeToTopicLegacy($topic, $tokens);
-
-if ($response) {
-    echo "Devices subscribed to topic successfully (Legacy API).";
-} else {
-    echo "Failed to subscribe devices to topic (Legacy API).";
-}
+```bash
+php artisan migrate
 ```
 
-#### Subscribe Devices to a Topic (FCM V1 API)
+## Explanation of Modules
 
-To subscribe devices to a topic using the FCM V1 API, use the `subscribeToTopicV1` method:
+1. **SmsManager**: Manages sending SMS messages and can log them to the database.
+2. **SmsProviderInterface**: Defines the contract that all SMS providers must implement.
+3. **Providers**: Each provider (e.g., `WhatsappProvider`, `MsgatProvider`, `UnifonicProvider`) implements the `SmsProviderInterface`.
+4. **SmsLog**: (Implemented in the main application) Logs SMS messages to the database, including the recipient, message, status, and timestamps.
 
-```php
-use Hijazi\FirebasePush\FirebasePushService;
-
-$firebasePushService = app(FirebasePushService::class);
-$topic = "news";
-$tokens = ['device_token1', 'device_token2'];
-$serviceAccountPath = storage_path('your-service-account.json');
-$projectId = "your-firebase-project-id";
-
-$response = $firebasePushService->subscribeToTopicV1($topic, $tokens, $serviceAccountPath, $projectId);
-
-if ($response) {
-    echo "Devices subscribed to topic successfully (FCM V1 API).";
-} else {
-    echo "Failed to subscribe devices to topic (FCM V1 API).";
-}
-```
-
-### 4. Mark Topic as Deleted
-
-To mark a topic as deleted, preventing further notifications from being sent to that topic, use the `markTopicAsDeleted` method:
-
-```php
-use Hijazi\FirebasePush\FirebasePushService;
-
-$firebasePushService = app(FirebasePushService::class);
-$topic = "news";
-
-$firebasePushService->markTopicAsDeleted($topic);
-
-echo "Topic marked as deleted.";
-```
-
-### 5. Explanation of Modules
-
-1. **FirebasePushService:** The core service that handles notifications and topic management, supporting both the Legacy API and FCM V1 API.
-2. **FirebasePushServiceProvider:** Integrates the package into Laravel, providing configuration and publishing migration files.
-3. **Configuration File:** Manages Firebase server key and logging settings.
-4. **Migration File:** Creates the `firebase_topics` table in the database for tracking topics.
-
-### Contributing
+## Contributing
 
 If you encounter any issues or have suggestions for improvements, feel free to open an issue or submit a pull request.
 
-### License
+## License
 
 This package is open-source software licensed under the [MIT license](https://opensource.org/licenses/MIT).
