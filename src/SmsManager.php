@@ -17,31 +17,32 @@ class SmsManager
     public function sendSms($recipient, $message)
     {
         if (!$this->provider) {
-            throw new \Exception('No SMS provider has been set.');
+            return [
+                'status' => 'failed',
+                'reason' => 'No SMS provider has been set.'
+            ];
         }
 
         // Check rate limit
         if (!$this->checkRateLimit($recipient)) {
-            throw new \Exception('Rate limit exceeded for this recipient.');
+            return [
+                'status' => 'failed',
+                'reason' => 'Rate limit exceeded for this recipient.'
+            ];
         }
 
         // Send the SMS
         $status = $this->provider->sendSms($recipient, $message) ? 'success' : 'failed';
 
-        // Log the SMS to the database
-        DB::table('sms_logs')->insert([
-            'mobile' => $recipient,
-            'sms' => $message,
+        // Update rate limit tracking if the SMS was sent successfully
+        if ($status === 'success') {
+            $this->updateRateLimit($recipient);
+        }
+
+        return [
             'status' => $status,
-            'send_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Update rate limit tracking
-        $this->updateRateLimit($recipient);
-
-        return $status;
+            'reason' => $status === 'success' ? 'SMS sent successfully.' : 'Failed to send SMS.'
+        ];
     }
 
     public function sendSmsAndLog($recipient, $message)
