@@ -1,6 +1,6 @@
 # Hijazisms - SMS Sending Package for Laravel
 
-This package provides a comprehensive solution for sending SMS using different providers in Laravel applications. It includes functionality for sending SMS directly, logging SMS messages to a database, and implementing a retry mechanism for failed SMS deliveries.
+This package provides a comprehensive solution for sending SMS using different providers in Laravel applications. It includes functionality for sending SMS directly, scheduling SMS messages, logging SMS messages to a database, implementing a retry mechanism for failed SMS deliveries, and enforcing rate limits.
 
 ## Table of Contents
 
@@ -8,19 +8,25 @@ This package provides a comprehensive solution for sending SMS using different p
 2. [Installation](#installation)
 3. [Configuration](#configuration)
 4. [Usage](#usage)
-   - [Sending SMS Without Logging](#sending-sms-without-logging)
+   - [Sending SMS](#sending-sms)
    - [Sending SMS with Logging](#sending-sms-with-logging)
+   - [Bulk SMS Sending](#bulk-sms-sending)
+   - [Scheduled SMS](#scheduled-sms)
    - [Retrying Failed SMS](#retrying-failed-sms)
+   - [Rate Limiting](#rate-limiting)
 5. [Managing Migrations](#managing-migrations)
 6. [Explanation of Modules](#explanation-of-modules)
-7. [Contributing](#contributing)
-8. [License](#license)
+7. [Scheduled Task Setup](#scheduled-task-setup)
+8. [Contributing](#contributing)
+9. [License](#license)
 
 ## Features
 
 - Send SMS using multiple providers (e.g., WhatsApp, Msgat, Unifonic).
-- Log SMS messages to a database with status tracking (success/failed).
+- Log SMS messages to a database with status tracking (success, failed, scheduled).
+- Schedule SMS messages to be sent at a future time.
 - Retry failed SMS messages.
+- Enforce rate limits to control the number of messages sent to a recipient within a time frame.
 - Seamless integration with Laravel’s configuration and service container.
 
 ## Installation
@@ -44,7 +50,7 @@ php artisan vendor:publish --provider="Hijazi\Hijazisms\HijazismsServiceProvider
 
 ### 3. Run the Migration
 
-After publishing, run the migration to create the `sms_logs` table:
+After publishing, run the migration to create the `sms_logs` and `sms_rate_limits` tables:
 
 ```bash
 php artisan migrate
@@ -91,9 +97,9 @@ return [
 
 ## Usage
 
-### 1. Sending SMS Without Logging
+### 1. Sending SMS
 
-To send SMS using a specific provider without logging it to the database, use the `sendSms` method:
+To send SMS using a specific provider, use the `sendSms` method:
 
 ```php
 use Hijazi\Hijazisms\SmsManager;
@@ -137,7 +143,48 @@ if ($status === 'success') {
 }
 ```
 
-### 3. Retrying Failed SMS
+### 3. Bulk SMS Sending
+
+To send SMS to multiple recipients in bulk, use the `sendSmsBulk` method:
+
+```php
+use Hijazi\Hijazisms\SmsManager;
+use Hijazi\Hijazisms\Providers\WhatsappProvider;
+
+$smsManager = app(SmsManager::class);
+$smsManager->setProvider(new WhatsappProvider(config('hijazisms.providers.whatsapp.api_key')));
+
+$recipients = ['0123456789', '0987654321', '0112233445'];
+$message = 'This is a bulk message';
+
+$results = $smsManager->sendSmsBulk($recipients, $message);
+
+foreach ($results as $recipient => $status) {
+    echo "SMS to {$recipient}: {$status}" . PHP_EOL;
+}
+```
+
+### 4. Scheduled SMS
+
+To schedule an SMS to be sent at a later time, use the `scheduleSms` method:
+
+```php
+use Hijazi\Hijazisms\SmsManager;
+use Hijazi\Hijazisms\Providers\WhatsappProvider;
+
+$smsManager = app(SmsManager::class);
+$smsManager->setProvider(new WhatsappProvider(config('hijazisms.providers.whatsapp.api_key')));
+
+$recipient = '0123456789';
+$message = 'This is a scheduled message';
+$sendAt = new DateTime('2024-09-15 10:00:00');
+
+$smsManager->scheduleSms($recipient, $message, $sendAt);
+
+echo "SMS scheduled successfully.";
+```
+
+### 5. Retrying Failed SMS
 
 To retry sending SMS messages that previously failed, use the `retryFailedSms` method:
 
@@ -145,9 +192,17 @@ To retry sending SMS messages that previously failed, use the `retryFailedSms` m
 $smsManager->retryFailedSms();
 ```
 
+### 6. Rate Limiting
+
+The package includes rate limiting to control the number of messages sent to a recipient within a specific time frame. The rate limit is set in the code and can be modified as needed.
+
+- **Default Rate Limit**: The default rate limit is 5 messages per hour. If a recipient exceeds this limit, no more messages will be sent to them until the limit resets.
+
+The rate limit is checked automatically in the `sendSms`, `sendSmsAndLog`, and `sendSmsBulk` methods.
+
 ## Managing Migrations
 
-The package includes a migration file that creates the `sms_logs` table used for logging SMS messages. To publish the migration to your main Laravel application, run:
+The package includes a migration file that creates the `sms_logs` and `sms_rate_limits` tables used for logging SMS messages, scheduling SMS, and tracking rate limits. To publish the migration to your main Laravel application, run:
 
 ```bash
 php artisan vendor:publish --provider="Hijazi\Hijazisms\HijazismsServiceProvider" --tag=migrations
@@ -161,10 +216,27 @@ php artisan migrate
 
 ## Explanation of Modules
 
-1. **SmsManager**: Manages sending SMS messages and can log them to the database.
+1. **SmsManager**: Manages sending SMS messages, scheduling, logging, retrying failed SMS, and enforcing rate limits.
 2. **SmsProviderInterface**: Defines the contract that all SMS providers must implement.
 3. **Providers**: Each provider (e.g., `WhatsappProvider`, `MsgatProvider`, `UnifonicProvider`) implements the `SmsProviderInterface`.
-4. **SmsLog**: (Implemented in the main application) Logs SMS messages to the database, including the recipient, message, status, and timestamps.
+4. **sms_logs**: Database table that logs all SMS messages, including those scheduled for future sending.
+5. **sms_rate_limits**: Database table that tracks the number of SMS messages sent to a recipient within a specific time frame to enforce rate limits.
+
+## Scheduled Task Setup
+
+To ensure scheduled SMS messages are sent, you should set up a scheduled task or cron job to call the `processScheduledSms` method regularly. Add the following entry to your Laravel schedule in `app/Console/Kernel.php`:
+
+```php
+protected function schedule(Schedule $schedule)
+{
+    $schedule->call(function () {
+        $smsManager = app(SmsManager::class);
+        $smsManager->processScheduledSms();
+    })->everyMinute();
+}
+```
+
+This setup ensures that the scheduled SMS messages are processed and sent at the correct time.
 
 ## Contributing
 

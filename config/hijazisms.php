@@ -13,4 +13,9 @@ return [
             'app_sid' => env('UNIFONIC_APP_SID', 'your-default-unifonic-app-sid'),
         ],
     ],
+    // Rate limit configuration
+    'rate_limit' => [
+        'count' => env('SMS_RATE_LIMIT_COUNT', 5),  // Default to 5 messages
+        'hours' => env('SMS_RATE_LIMIT_HOURS', 1),  // Default to 1 hour
+    ],
 ];

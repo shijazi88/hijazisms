@@ -121,6 +121,10 @@ class SmsManager
     // Check if the recipient has exceeded the rate limit
     protected function checkRateLimit($mobile)
     {
+        // Retrieve the rate limit values from the configuration
+        $limitCount = config('hijazisms.rate_limit.count'); // Default is handled in config file
+        $limitHours = config('hijazisms.rate_limit.hours'); // Default is handled in config file
+
         $rateLimit = DB::table('sms_rate_limits')->where('mobile', $mobile)->first();
 
         if (!$rateLimit) {
@@ -130,13 +134,14 @@ class SmsManager
         $sentCount = $rateLimit->sent_count;
         $lastSentAt = $rateLimit->last_sent_at;
 
-        // Assuming a limit of 5 messages per hour
-        if ($sentCount >= 5 && now()->diffInHours($lastSentAt) < 1) {
+        // Check against the dynamic rate limits
+        if ($sentCount >= $limitCount && now()->diffInHours($lastSentAt) < $limitHours) {
             return false;
         }
 
         return true;
     }
+
 
     // Update the rate limit tracking after sending an SMS
     protected function updateRateLimit($mobile)
