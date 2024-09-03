@@ -104,9 +104,8 @@ $smsManager->setProvider(new WhatsappProvider(config('hijazisms.providers.whatsa
 
 $recipient = '0123456789';
 $message = 'Your verification code is 123456';
-$otp = '123456';
 
-$status = $smsManager->sendSms($recipient, $message, $otp);
+$status = $smsManager->sendSms($recipient, $message);
 
 if ($status) {
     echo "SMS sent successfully.";
@@ -128,9 +127,8 @@ $smsManager->setProvider(new WhatsappProvider(config('hijazisms.providers.whatsa
 
 $recipient = '0123456789';
 $message = 'Your verification code is 123456';
-$otp = '123456';
 
-$status = $smsManager->sendSmsAndLog($recipient, $message, $otp);
+$status = $smsManager->sendSmsAndLog($recipient, $message);
 
 if ($status === 'success') {
     echo "SMS sent and logged successfully.";

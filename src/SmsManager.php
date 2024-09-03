@@ -14,26 +14,23 @@ class SmsManager
         $this->provider = $provider;
     }
 
-    public function sendSms($recipient, $message, $otp)
+    public function sendSms($recipient, $message)
     {
         if (!$this->provider) {
             throw new \Exception('No SMS provider has been set.');
         }
 
-        return $this->provider->sendSms($recipient, $message, $otp);
+        return $this->provider->sendSms($recipient, $message);
     }
 
-    // New method to send SMS and log to the database
-    public function sendSmsAndLog($recipient, $message, $otp)
+    public function sendSmsAndLog($recipient, $message)
     {
         if (!$this->provider) {
             throw new \Exception('No SMS provider has been set.');
         }
 
-        // Attempt to send the SMS
-        $status = $this->provider->sendSms($recipient, $message, $otp) ? 'success' : 'failed';
+        $status = $this->provider->sendSms($recipient, $message) ? 'success' : 'failed';
 
-        // Log the SMS to the database using DB::table
         DB::table('sms_logs')->insert([
             'mobile' => $recipient,
             'sms' => $message,
@@ -45,15 +42,13 @@ class SmsManager
         return $status;
     }
 
-    // Retry sending failed SMS messages
     public function retryFailedSms()
     {
         $failedSmsLogs = DB::table('sms_logs')->where('status', 'failed')->get();
 
         foreach ($failedSmsLogs as $log) {
-            $status = $this->provider->sendSms($log->mobile, $log->sms, null) ? 'success' : 'failed';
+            $status = $this->provider->sendSms($log->mobile, $log->sms) ? 'success' : 'failed';
 
-            // Update the status in the database using DB::table
             DB::table('sms_logs')
                 ->where('id', $log->id)
                 ->update([
@@ -61,5 +56,32 @@ class SmsManager
                     'updated_at' => now(),
                 ]);
         }
+    }
+
+    // Method to send SMS in bulk
+    public function sendSmsBulk(array $recipients, $message)
+    {
+        if (!$this->provider) {
+            throw new \Exception('No SMS provider has been set.');
+        }
+
+        $results = [];
+
+        foreach ($recipients as $recipient) {
+            $status = $this->provider->sendSms($recipient, $message) ? 'success' : 'failed';
+
+            // Log each SMS attempt to the database
+            DB::table('sms_logs')->insert([
+                'mobile' => $recipient,
+                'sms' => $message,
+                'status' => $status,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $results[$recipient] = $status;
+        }
+
+        return $results;
     }
 }

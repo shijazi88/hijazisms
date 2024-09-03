@@ -14,7 +14,7 @@ class UnifonicProvider implements SmsProviderInterface
         $this->appSid = $appSid;
     }
 
-    public function sendSms($recipient, $message, $otp)
+    public function sendSms($recipient, $message)
     {
         $url = 'http://basic.unifonic.com/rest/SMS/messages?AppSid=' . $this->appSid . '&SenderID=EliteVPS&Body=' . urlencode($message) . '&Recipient=' . $recipient . '&responseType=JSON&CorrelationID=%22%22&baseEncode=true&statusCallback=sent&async=false';
 

@@ -14,7 +14,7 @@ class WhatsappProvider implements SmsProviderInterface
         $this->apiKey = $apiKey;
     }
 
-    public function sendSms($recipient, $message, $otp)
+    public function sendSms($recipient, $message)
     {
         $whatsappNumberFormatted = '966' . ltrim($recipient, '0');
         $apiUrl = 'https://live-mt-server.wati.io/300738/api/v1/sendTemplateMessage?whatsappNumber=' . $whatsappNumberFormatted;
@@ -28,7 +28,7 @@ class WhatsappProvider implements SmsProviderInterface
             'parameters' => [
                 [
                     'name' => '1',
-                    'value' => $otp,
+                    'value' => $message,
                 ],
             ],
         ]);

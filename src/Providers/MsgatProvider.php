@@ -16,7 +16,7 @@ class MsgatProvider implements SmsProviderInterface
         $this->senderName = $senderName;
     }
 
-    public function sendSms($recipient, $message, $otp)
+    public function sendSms($recipient, $message)
     {
         $response = Http::post('https://www.msegat.com/gw/sendsms.php', [
             'userName' => $this->senderName,
