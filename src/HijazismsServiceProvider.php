@@ -19,8 +19,6 @@ class HijazismsServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        \Log::info('HijazismsServiceProvider boot method called.');
-
         // Publish the configuration file
         $this->publishes([
             __DIR__.'/../config/hijazisms.php' => config_path('hijazisms.php'),
